@@ -52,11 +52,38 @@ export function getHeroOverall(hero, heroStats) {
   return { rate: s.winRate, plays: s.totalPlays };
 }
 
+/** Tier priority multipliers on final pick score (UMLeague Bradley-Terry buckets). */
+export const TIER_WEIGHT = {
+  S: 1.15,
+  A: 1.08,
+  B: 1.0,
+  C: 0.92,
+  D: 0.72,
+  F: 0.55,
+};
+
+/** Never recommend these tiers for your draft picks. */
+export const TIERS_BLOCKED_FOR_PICK = new Set(["D", "F"]);
+
 /** Bradley-Terry expected win % from UMLeague tier list (≥10 games). */
 export function getHeroBT(hero, tierList) {
   const t = tierList?.[hero];
   if (!t || t.games < 10 || t.bt == null) return null;
   return { rate: t.bt, tier: t.tier, games: t.games };
+}
+
+/** Apply tier priority; block D/F for your draft picks. */
+export function applyTierPriority(resolved, { mode, forUserPick }) {
+  if (resolved.rate == null) return resolved;
+
+  const tier = resolved.tier;
+  if (forUserPick && mode === "pick" && tier && TIERS_BLOCKED_FOR_PICK.has(tier)) {
+    return { ...resolved, rate: null };
+  }
+
+  if (!tier || TIER_WEIGHT[tier] == null) return resolved;
+
+  return { ...resolved, rate: resolved.rate * TIER_WEIGHT[tier] };
 }
 
 /**
@@ -80,7 +107,7 @@ export function resolveScore(
     let rate = matchupRate * wMatchup;
     const rem = 1 - wMatchup;
     if (rem > 0) {
-      if (bt && overall) rate += rem * (0.55 * bt.rate + 0.45 * overall.rate);
+      if (bt && overall) rate += rem * (0.65 * bt.rate + 0.35 * overall.rate);
       else if (bt) rate += rem * bt.rate;
       else if (overall) rate += rem * overall.rate;
     }
@@ -95,7 +122,7 @@ export function resolveScore(
 
   if (bt && overall) {
     return {
-      rate: 0.6 * bt.rate + 0.4 * overall.rate,
+      rate: 0.72 * bt.rate + 0.28 * overall.rate,
       games: 0,
       overallRate: overall.rate,
       btRate: bt.rate,
@@ -201,13 +228,19 @@ export function getRecommendations({
         return { hero, score: null, reason: "", games: 0 };
     }
 
-    const resolved = resolveScore(
-      weighted.rate,
-      weighted.games,
-      hero,
-      heroStats,
-      tierList,
-      vsRoster
+    const resolved = applyTierPriority(
+      resolveScore(
+        weighted.rate,
+        weighted.games,
+        hero,
+        heroStats,
+        tierList,
+        vsRoster
+      ),
+      {
+        mode,
+        forUserPick: !oppTurn,
+      }
     );
     return {
       hero,

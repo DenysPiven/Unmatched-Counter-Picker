@@ -33,7 +33,7 @@ Cell `medusa,bigfoot` = Medusa’s win % vs Bigfoot. Empty = no recorded games.
 ## Recommendations
 
 - **Matchups** — only pairs with recorded games in `plays.csv` (weighted by game count).
-- **Early pool** — blends **Bradley-Terry** (`bt_pct`, `tier`) with **overall win %** from the same `heroes.csv` row.
+- **Early pool** — blends **Bradley-Terry** (`bt_pct`, `tier`) with **overall win %**. **D/F** tiers are never suggested for your picks; **S/A/B/C** get priority multipliers.
 - **Vs known roster** — real matchup win % dominates; tier/overall are tie-breakers.
 - **No 50/50 placeholders** — unknown matchups are not used.
 

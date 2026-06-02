@@ -134,6 +134,29 @@ def get_hero_bt(hero: str, tier: dict) -> dict | None:
     return t
 
 
+TIER_WEIGHT = {"S": 1.15, "A": 1.08, "B": 1.0, "C": 0.92, "D": 0.72, "F": 0.55}
+TIERS_BLOCKED_FOR_PICK = {"D", "F"}
+
+
+def apply_tier_score(
+    score: float | None,
+    hero: str,
+    tier: dict,
+    mode: str,
+    *,
+    for_user_pick: bool,
+) -> float | None:
+    if score is None:
+        return None
+    bt = get_hero_bt(hero, tier)
+    letter = bt["tier"] if bt else None
+    if for_user_pick and mode == "pick" and letter in TIERS_BLOCKED_FOR_PICK:
+        return None
+    if letter and letter in TIER_WEIGHT:
+        return score * TIER_WEIGHT[letter]
+    return score
+
+
 def resolve_score(
     matchup_rate: float | None,
     matchup_games: int,
@@ -153,7 +176,7 @@ def resolve_score(
         rem = 1 - w_matchup
         if rem > 0:
             if bt and ov_rate is not None:
-                rate += rem * (0.55 * bt["bt"] + 0.45 * ov_rate)
+                rate += rem * (0.65 * bt["bt"] + 0.35 * ov_rate)
             elif bt:
                 rate += rem * bt["bt"]
             elif ov_rate is not None:
@@ -161,7 +184,7 @@ def resolve_score(
         return rate
 
     if bt and ov_rate is not None:
-        return 0.6 * bt["bt"] + 0.4 * ov_rate
+        return 0.72 * bt["bt"] + 0.28 * ov_rate
     if bt:
         return bt["bt"]
     if ov_rate is not None:
@@ -179,6 +202,8 @@ def rank_heroes(
     hero_stats: dict,
     tier: dict,
     mode: str,
+    *,
+    for_user_pick: bool = False,
 ) -> list[tuple[str, float]]:
     vs_roster = mode != "pick" or len(opp_team) > 0 or len(my_team) > 0
     scored: list[tuple[str, float]] = []
@@ -199,13 +224,19 @@ def rank_heroes(
         else:
             vs_roster_flag = True
 
-        score = resolve_score(
-            m_rate,
-            m_games,
+        score = apply_tier_score(
+            resolve_score(
+                m_rate,
+                m_games,
+                hero,
+                hero_stats,
+                tier,
+                vs_roster_flag if mode == "pick" else True,
+            ),
             hero,
-            hero_stats,
             tier,
-            vs_roster_flag if mode == "pick" else True,
+            mode,
+            for_user_pick=for_user_pick,
         )
         if score is not None:
             scored.append((hero, score))
@@ -241,7 +272,8 @@ def system_choice(
     rng: random.Random,
 ) -> str | None:
     ranked = rank_heroes(
-        candidates, st.my_team, st.opp_team, pool, wr, plays, hero_stats, tier, mode
+        candidates, st.my_team, st.opp_team, pool, wr, plays, hero_stats, tier, mode,
+        for_user_pick=True,
     )
     k = BAN_TOP_K if mode != "pick" else PICK_TOP_K
     return pick_from_top_k(ranked, k, rng)

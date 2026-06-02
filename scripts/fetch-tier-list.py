@@ -22,6 +22,21 @@ HERO_FIELDS = [
     "bt_games",
 ]
 
+BT_ARIA = re.compile(
+    r'characters/([a-z0-9-]+)\\",\\"aria-label\\":\\"[^"]+: '
+    r"([\d.]+) percent expected win rate over (\d+) games\\\""
+)
+
+# First fighter in each tier group inside the Tier F section chunk (stream order).
+BF_TIER_STARTS = (
+    ("george-washington", "F"),
+    ("she-hulk", "B"),
+    ("wyatt-earp", "C"),
+    ("bruce-lee", "B"),
+    ("pandora", "C"),
+    ("buffy", "D"),
+)
+
 
 def fetch(url: str) -> str:
     r = subprocess.run(
@@ -34,32 +49,86 @@ def fetch(url: str) -> str:
     return r.stdout
 
 
+def _section_bounds(html: str, letter: str, next_letter: str) -> tuple[int, int]:
+    start_pat = rf'\\"section\\",\\"{letter}\\",\{{\\"aria-label\\":\\"Tier {letter},'
+    next_pat = rf'\\"section\\",\\"{next_letter}\\",\{{\\"aria-label\\":\\"Tier {next_letter},'
+    m = re.search(start_pat, html)
+    if not m:
+        return 0, 0
+    m2 = re.search(next_pat, html[m.end() :])
+    end = m.end() + m2.start() if m2 else m.end() + 20_000
+    return m.start(), end
+
+
+def _parse_bt_entries(html: str, start: int, end: int) -> list[tuple[str, float, int, int]]:
+    """Return (slug, bt_pct, bt_games, position) within [start, end)."""
+    out: list[tuple[str, float, int, int]] = []
+    for m in BT_ARIA.finditer(html[start:end]):
+        slug = m.group(1)
+        games = int(m.group(3))
+        if games < MIN_BT_GAMES or "-alt-10" in slug:
+            continue
+        out.append((slug, float(m.group(2)), games, start + m.start()))
+    return out
+
+
+def _chunk_bounds(html: str, start_key: str, end_key: str) -> tuple[int, int]:
+    s = html.find(start_key)
+    e = html.find(end_key, s)
+    return s, e if e != -1 else s + 120_000
+
+
+def _parse_bf_chunk_tiers(f_chunk: str) -> dict[str, dict[str, float | int | str]]:
+    """Assign tiers for fighters listed in the Tier F section chunk."""
+    out: dict[str, dict[str, float | int | str]] = {}
+    current_tier = "F"
+    transitions = dict(BF_TIER_STARTS)
+
+    for m in BT_ARIA.finditer(f_chunk):
+        slug = m.group(1)
+        games = int(m.group(3))
+        if games < MIN_BT_GAMES or "-alt-10" in slug:
+            continue
+        if slug in transitions:
+            current_tier = transitions[slug]
+        out[slug] = {
+            "tier": current_tier,
+            "bt_pct": float(m.group(2)),
+            "bt_games": games,
+        }
+
+    return out
+
+
 def parse_tier_list(html: str) -> dict[str, dict[str, float | int | str]]:
-    """Parse tier sections from Next.js RSC payload (official slugs only)."""
-    parts = re.split(r'\\"aria-label\\":\\"Tier ([A-Z]),', html)
+    """Parse tier + Bradley-Terry stats from Tabletop League tier list page."""
     data: dict[str, dict[str, float | int | str]] = {}
 
-    for i in range(1, len(parts), 2):
-        tier = parts[i]
-        body = parts[i + 1] if i + 1 < len(parts) else ""
-        for m in re.finditer(r"/games/unmatched/stats/characters/([a-z0-9-]+)", body):
-            slug = m.group(1)
-            if "-alt-10" in slug:
-                continue
-            chunk = body[m.start() : m.start() + 400]
-            stats = re.search(
-                r"([\d.]+) percent expected win rate over (\d+) games", chunk
-            )
-            if not stats or slug in data:
-                continue
-            games = int(stats.group(2))
-            if games < MIN_BT_GAMES:
-                continue
-            data[slug] = {
-                "tier": tier,
-                "bt_pct": float(stats.group(1)),
-                "bt_games": games,
-            }
+    for letter, nxt in (("S", "A"), ("A", "B")):
+        s, e = _section_bounds(html, letter, nxt)
+        for slug, pct, games, _ in _parse_bt_entries(html, s, e):
+            data[slug] = {"tier": letter, "bt_pct": pct, "bt_games": games}
+
+    for letter, start_key, end_key in (
+        ("B", '[1,"bc:', '[1,"bd:'),
+        ("C", '[1,"bd:', '[1,"be:'),
+        ("D", '[1,"be:', '[1,"bf:'),
+    ):
+        s, e = _chunk_bounds(html, start_key, end_key)
+        for slug, pct, games, _ in _parse_bt_entries(html, s, e):
+            data[slug] = {"tier": letter, "bt_pct": pct, "bt_games": games}
+
+    # Remaining fighters live in the Tier F section chunk (multi-column masonry).
+    f_start = html.find('[1,"bf:')
+    f_end = html.find('[1,"bg:', f_start)
+    if f_end == -1:
+        f_end = f_start + 120_000
+    f_chunk = html[f_start:f_end]
+
+    bf_data = _parse_bf_chunk_tiers(f_chunk)
+    for slug, entry in bf_data.items():
+        if slug not in data:
+            data[slug] = entry
 
     return data
 
