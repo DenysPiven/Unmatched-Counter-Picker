@@ -1,0 +1,6 @@
+Source: Tabletop League / UMLeague
+URL: https://www.tabletopleague.com/games/unmatched/stats/characters
+Updated: 2026-06-02
+heroes.csv — names, overall stats, Bradley-Terry tier
+matchups.csv — win % (row vs column)
+plays.csv — recorded games per matchup (for weighted stats)

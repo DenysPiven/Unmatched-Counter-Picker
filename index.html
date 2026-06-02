@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#1a1f2e" />
+  <title>Unmatched Counter Pick</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Unmatched Counter Pick</h1>
+    <p class="sub">4+4 draft · bans · UMLeague stats</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="draft" role="tab">Draft</button>
+    <button type="button" class="tab" data-tab="pool" role="tab">Excluded</button>
+  </nav>
+
+  <div id="panel-draft" class="tab-panel">
+    <section class="panel phase-panel">
+      <div id="phase-label" class="phase-label">Loading…</div>
+      <div class="controls-row">
+        <label>
+          You are
+          <select id="leader-role">
+          <option value="me">First pick</option>
+          <option value="opp">Second pick</option>
+          </select>
+        </label>
+        <button type="button" id="btn-reset" class="btn danger">Reset</button>
+      </div>
+      <p class="hint setup-hint">8 picks alternating, then bans.</p>
+      <p id="pool-count" class="hint setup-hint"></p>
+    </section>
+
+    <section class="panel teams-panel">
+      <div class="team">
+        <h2>Your team</h2>
+        <p id="my-team" class="team-list">—</p>
+        <h3>Banned from your roster</h3>
+        <p id="my-bans" class="ban-list">—</p>
+      </div>
+      <div class="team">
+        <h2>Opponent</h2>
+        <p id="opp-team" class="team-list">—</p>
+        <h3>Banned from their roster</h3>
+        <p id="opp-bans" class="ban-list">—</p>
+      </div>
+      <p id="secret-status" class="secret-status" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2>Recommendations</h2>
+      <ol id="rec-list" class="rec-list"></ol>
+    </section>
+
+    <section class="panel">
+      <h2>Pick hero</h2>
+      <input type="search" id="search" class="search" placeholder="Search…" autocomplete="off" />
+      <div id="hero-grid" class="hero-grid"></div>
+      <p class="hint">Your turn: tap a hero. Opponent's turn: tap their choice.</p>
+    </section>
+  </div>
+
+  <div id="panel-pool" class="tab-panel" hidden>
+    <section class="panel">
+      <h2>Excluded fighters</h2>
+      <p class="hint">Checked = not in your pool (no draft, bans, or tips).</p>
+      <div class="controls-row">
+        <button type="button" id="btn-pool-default" class="btn secondary">Defaults</button>
+        <button type="button" id="btn-pool-all" class="btn secondary">Clear all</button>
+      </div>
+      <input type="search" id="pool-search" class="search" placeholder="Search fighters…" autocomplete="off" />
+      <div id="pool-list" class="pool-list"></div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <a href="https://www.tabletopleague.com/games/unmatched/stats/characters" target="_blank" rel="noopener">UMLeague · Tabletop League</a>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

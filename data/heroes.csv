@@ -1,0 +1,75 @@
+slug,name,win_pct,plays,rating_pct,tier,bt_pct,bt_games
+achilles,Achilles,54.3,4007,58.1,B,58.1,4011
+alice,Alice,48.0,2311,50.2,C,50.2,444
+ancient-leshen,Ancient Leshen,45.9,1167,51.5,F,51.5,386
+angel,Angel,37.4,243,42.5,F,42.5,39
+annie-christmas,Annie Christmas,51.0,2114,50.8,C,50.8,484
+beowulf,Beowulf,45.0,1219,43.0,F,43.0,224
+bigfoot,Bigfoot,53.1,3818,58.3,B,58.3,919
+black-panther,Black Panther,49.3,1968,44.2,F,44.2,503
+black-widow,Black Widow,43.1,1922,45.4,F,45.4,1924
+blackbeard,Blackbeard,57.8,1373,61.2,A,61.2,1374
+bloody-mary,Bloody Mary,44.8,1544,41.1,D,41.1,229
+bruce-lee,Bruce Lee,50.2,2158,54.4,F,54.4,424
+buffy,Buffy,43.7,552,40.5,F,40.5,110
+bullseye,Bullseye,40.9,1636,45.0,F,45.0,371
+chupacabra,Chupacabra,43.9,1211,47.3,F,47.3,297
+ciri,Ciri,51.0,1513,55.7,F,55.7,1513
+cloak-dagger,Cloak Dagger,48.1,772,51.7,F,51.7,204
+daredevil,Daredevil,43.0,2748,44.4,F,44.4,729
+deadpool,Deadpool,49.2,303,41.9,D,41.9,36
+doctor-strange,Doctor Strange,52.6,1705,58.5,A,58.5,1706
+donatello,Donatello,51.7,814,45.4,F,45.4,237
+dr-jill-trent,Dr. Jill Trent,51.1,2630,56.0,F,56.0,2323
+dr-sattler,Dr. Sattler,53.9,1090,53.3,F,53.3,207
+dracula,Dracula,50.9,2613,56.4,F,56.4,571
+elektra,Elektra,66.4,614,69.6,S,69.6,148
+eredin,Eredin,52.3,1361,58.2,B,58.2,307
+george-washington,George Washington,33.9,227,32.9,F,32.9,49
+geralt-of-rivia,Geralt of Rivia,49.8,1674,44.7,F,44.7,428
+ghost-rider,Ghost Rider,38.3,1159,44.3,F,44.3,186
+golden-bat,Golden Bat,54.6,2876,58.2,B,58.2,686
+hamlet,Hamlet,34.8,557,34.3,F,34.3,147
+houdini,Houdini,54.9,3457,63.4,A,63.4,855
+ingen,InGen,50.8,1837,62.5,A,62.5,416
+invisible-man,Invisible Man,39.6,952,33.1,F,33.1,159
+jekyll-hyde,Jekyll Hyde,40.8,955,42.5,F,42.5,128
+john-henry,John Henry,52.5,467,62.6,A,62.6,92
+king-arthur,King Arthur,38.2,809,45.9,F,45.9,133
+krang,Krang,51.7,553,38.5,F,38.5,191
+leonardo,Leonardo,47.1,497,54.0,F,54.0,173
+little-red-riding-hood,Little Red Riding Hood,49.5,3426,52.9,,,
+loki,Loki,46.9,1341,49.9,C,49.9,327
+luke-cage,Luke Cage,53.2,3559,57.1,F,57.1,747
+medusa,Medusa,57.7,3468,63.8,A,63.8,745
+michelangelo,Michelangelo,42.6,636,58.5,A,58.5,202
+moon-knight,Moon Knight,50.5,2830,55.1,F,55.1,656
+ms-marvel,Ms. Marvel,43.0,612,33.8,F,33.8,127
+muhammad-ali,Muhammad Ali,43.2,433,46.2,F,46.2,435
+nikola-tesla,Nikola Tesla,50.9,3363,55.5,F,55.5,1022
+oda-nobunaga,Oda Nobunaga,46.8,447,44.2,F,44.2,447
+pandora,Pandora,44.3,1058,48.7,F,48.7,276
+philippa,Philippa,41.3,1094,43.9,F,43.9,1094
+raphael,Raphael,59.9,1503,63.4,A,63.4,1503
+raptors,Raptors,54.9,2159,57.2,F,57.2,2161
+robin-hood,Robin Hood,42.7,2225,47.1,F,47.1,532
+rosie-the-riveter,Rosie the Riveter,53.4,176,67.6,A,67.6,51
+shakespeare,Shakespeare,42.6,904,46.5,F,46.5,225
+she-hulk,She-Hulk,52.5,1856,57.6,F,57.6,476
+sherlock-holmes,Sherlock Holmes,60.9,1260,60.9,A,60.9,366
+shredder,Shredder,52.1,785,55.4,F,55.4,785
+sinbad,Sinbad,51.5,2435,54.8,F,54.8,2435
+spider-man,Spider-Man,39.1,626,33.3,F,33.3,157
+spike,Spike,35.7,171,33.1,F,33.1,24
+squirrel-girl,Squirrel Girl,46.7,259,41.6,D,41.6,259
+sun-wukong,Sun Wukong,56.2,2795,65.8,A,65.8,693
+t-rex,T. Rex,57.6,2484,67.2,A,67.2,512
+the-genie,The Genie,47.0,2976,48.9,C,48.9,754
+the-wayward-sisters,The Wayward Sisters,45.8,812,47.6,F,47.6,812
+titania,Titania,47.2,1403,46.0,F,46.0,404
+tomoe-gozen,Tomoe Gozen,50.0,3120,53.8,F,53.8,919
+willow,Willow,23.2,151,17.2,F,17.2,25
+winter-soldier,Winter Soldier,38.4,1640,42.0,D,42.0,1642
+wyatt-earp,Wyatt Earp,44.2,484,56.5,F,56.5,115
+yennefer-triss,Yennefer Triss,52.0,1983,55.6,F,55.6,687
+yennenga,Yennenga,52.8,4635,52.1,F,52.1,1278
