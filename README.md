@@ -2,7 +2,9 @@
 
 Mobile-friendly draft helper for **Unmatched** tournaments: 4 picks each, ban phases, and counter-pick suggestions from **UMLeague** stats on [Tabletop League](https://www.tabletopleague.com/games/unmatched/stats/characters).
 
-## Run on your phone
+**Live app:** [denyspiven.github.io/UnmatchedCounterPicker](https://denyspiven.github.io/UnmatchedCounterPicker/)
+
+## Run locally
 
 ```bash
 cd /path/to/UnmatchedCounterPick
