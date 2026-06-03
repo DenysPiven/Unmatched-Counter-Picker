@@ -246,36 +246,57 @@ select {
   background: #252b3a;
 }
 
+.pool-tab-count {
+  margin: 8px 0 0;
+}
+
 .pool-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 60vh;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 55vh;
   overflow-y: auto;
   margin-top: 10px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pool-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 8px;
+  gap: 8px;
+  padding: 10px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pool-row:active {
+  border-color: var(--accent);
 }
 
 .pool-row:has(input:checked) {
-  opacity: 0.65;
+  opacity: 0.72;
   border-style: dashed;
+  background: #222836;
 }
 
 .pool-row input {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.pool-name {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
 .hint {

@@ -33,8 +33,10 @@ Cell `medusa,bigfoot` = Medusa’s win % vs Bigfoot. Empty = no recorded games.
 ## Recommendations
 
 - **Matchups** — only pairs with recorded games in `plays.csv` (weighted by game count).
+- **Likely opponent** — not a flat average over the whole team: stronger picks (BT/tier) count more, and during draft the engine also considers heroes they are likely to pick next from the remaining pool.
 - **Early pool** — blends **Bradley-Terry** (`bt_pct`, `tier`) with **overall win %**. **D/F** tiers are never suggested for your picks; **S/A/B/C** get priority multipliers.
 - **Vs known roster** — real matchup win % dominates; tier/overall are tie-breakers.
+- **Bans** — ban their fighter that beats your likely main; self-ban your weakest vs their likely main; opponent-ban hints use the same weights.
 - **No 50/50 placeholders** — unknown matchups are not used.
 
 `scripts/fill-matchups.py` only **mirrors** real data and removes win % without games.

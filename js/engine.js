@@ -20,9 +20,86 @@ export function getPlays(hero, opponent, plays) {
   return 0;
 }
 
-/** Weighted Σ(win% × plays) / Σ(plays) — only pairs with recorded games. */
-export function scoreVsTeamWeighted(hero, team, matchups, plays) {
+/** Single-number strength for pick/ban likelihood (0–1). */
+export function heroStrength(hero, heroStats, tierList) {
+  const bt = getHeroBT(hero, tierList);
+  if (bt?.rate != null) return bt.rate;
+  const overall = getHeroOverall(hero, heroStats);
+  if (overall?.rate != null) return overall.rate;
+  return 0.5;
+}
+
+/**
+ * How likely each fighter is to be the one actually played / kept.
+ * Stronger heroes get more weight (softmax on BT/overall).
+ */
+export function teamPickWeights(team, heroStats, tierList) {
+  if (!team.length) return {};
+  if (team.length === 1) return { [team[0]]: 1 };
+
+  const strengths = team.map((h) => heroStrength(h, heroStats, tierList));
+  const max = Math.max(...strengths);
+  const exp = strengths.map((s) => Math.exp((s - max) * 8));
+  const sum = exp.reduce((a, b) => a + b, 0);
+  const weights = {};
+  team.forEach((h, i) => {
+    weights[h] = exp[i] / sum;
+  });
+  return weights;
+}
+
+/** Top *n* unpicked heroes the opponent is most likely to draft next. */
+export function likelyPoolPicks(pool, heroStats, tierList, n = 3) {
+  return [...pool]
+    .sort(
+      (a, b) =>
+        heroStrength(b, heroStats, tierList) - heroStrength(a, heroStats, tierList)
+    )
+    .slice(0, Math.max(0, n));
+}
+
+/**
+ * Opponent roster for scoring: known picks + a few likely future picks (draft).
+ * @returns {{ roster: string[], weights: Record<string, number> }}
+ */
+export function opponentLikelyRoster(
+  oppTeam,
+  draftPool,
+  heroStats,
+  tierList,
+  { maxFuture = 3, futureWeight = 0.35 } = {}
+) {
+  if (!oppTeam.length && !draftPool.length) {
+    return { roster: [], weights: {} };
+  }
+
+  if (!draftPool.length) {
+    return { roster: [...oppTeam], weights: teamPickWeights(oppTeam, heroStats, tierList) };
+  }
+
+  const future = likelyPoolPicks(draftPool, heroStats, tierList, maxFuture);
+  const roster = [...new Set([...oppTeam, ...future])];
+  const weights = teamPickWeights(roster, heroStats, tierList);
+  for (const h of future) {
+    weights[h] = (weights[h] ?? 0) * futureWeight;
+  }
+  const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+  if (sum > 0) {
+    for (const h of roster) weights[h] /= sum;
+  }
+  return { roster, weights };
+}
+
+/**
+ * Weighted Σ(win% × plays × pickWeight) / Σ(plays × pickWeight).
+ * pickWeights: who on `team` is likely to be played / targeted (not equal average).
+ */
+export function scoreVsTeamWeighted(hero, team, matchups, plays, pickWeights = null) {
   if (!team.length) return { rate: null, games: 0 };
+
+  const fallback =
+    pickWeights ??
+    Object.fromEntries(team.map((h) => [h, 1 / team.length]));
 
   let weighted = 0;
   let games = 0;
@@ -31,11 +108,14 @@ export function scoreVsTeamWeighted(hero, team, matchups, plays) {
     if (p <= 0) continue;
     const rate = getWinRate(hero, opp, matchups, plays);
     if (rate == null) continue;
-    weighted += rate * p;
-    games += p;
+    const w = fallback[opp] ?? 1 / team.length;
+    weighted += rate * p * w;
+    games += p * w;
   }
 
-  if (games > 0) return { rate: weighted / games, games };
+  if (games > 0) {
+    return { rate: weighted / games, games: Math.round(games) };
+  }
   return { rate: null, games: 0 };
 }
 
@@ -151,17 +231,53 @@ export function resolveScore(
   return { rate: null, games: 0, overallRate: null, btRate: null, tier: null };
 }
 
-function formatReason(label, resolved) {
+/**
+ * Who the score is weighted against (opponent picks, not the hero you might take).
+ * @param {string} [excludeSlug] — drop from display/projection (current pick candidate)
+ */
+function formatLikelyTargets(
+  roster,
+  weights,
+  { excludeSlug = null, oppTeam = [], labelHero = (s) => s, limit = 2 } = {}
+) {
+  const known = oppTeam.filter((h) => h !== excludeSlug);
+  if (known.length) {
+    const top = [...known]
+      .sort((a, b) => (weights[b] ?? 0) - (weights[a] ?? 0))
+      .slice(0, limit)
+      .filter((h) => (weights[h] ?? 0) > 0.08);
+    if (top.length) {
+      return `vs ${top.map(labelHero).join(", ")}`;
+    }
+  }
+
+  const projected = roster.filter(
+    (h) => h !== excludeSlug && !oppTeam.includes(h)
+  );
+  if (!projected.length) return "";
+
+  const top = [...projected]
+    .sort((a, b) => (weights[b] ?? 0) - (weights[a] ?? 0))
+    .slice(0, limit)
+    .filter((h) => (weights[h] ?? 0) > 0.08);
+  if (!top.length) return "";
+  return `vs possible ${top.map(labelHero).join(", ")}`;
+}
+
+function formatReason(label, resolved, likelyNote = "") {
   if (resolved.rate == null) return `${label} — no league data`;
   const pct = Math.round(resolved.rate * 100);
   const bits = [];
+  if (likelyNote) bits.push(likelyNote);
   if (resolved.tier && resolved.btRate != null) {
     bits.push(`${resolved.tier}-tier ${Math.round(resolved.btRate * 100)}% BT`);
   }
   if (resolved.overallRate != null) {
     bits.push(`${Math.round(resolved.overallRate * 100)}% overall`);
   }
-  if (resolved.games > 0) bits.push(`${resolved.games} matchup games`);
+  if (resolved.games > 0) {
+    bits.push(`${Math.round(resolved.games)} matchup games`);
+  }
   if (bits.length) return `${label} ~${pct}% (${bits.join(" · ")})`;
   return `${label} ~${pct}%`;
 }
@@ -178,51 +294,138 @@ export function getRecommendations({
   heroStats = {},
   tierList = {},
   allHeroes,
+  draftPool = [],
   actor = "me",
+  labelHero = (slug) => slug,
   limit = RECOMMENDATION_LIMIT,
 }) {
   const oppTurn = actor === "opp";
+
+  const myWeights = teamPickWeights(myTeam, heroStats, tierList);
+  const banPhaseOppRoster = opponentLikelyRoster(
+    oppTeam,
+    [],
+    heroStats,
+    tierList
+  );
 
   const scored = available.map((hero) => {
     let label = "";
     let weighted = { rate: null, games: 0 };
     let vsRoster = false;
+    let likelyNote = "";
+    const likelyOpts = { labelHero, excludeSlug: hero };
+
+    const oppRosterForPick = opponentLikelyRoster(
+      oppTeam,
+      draftPool.filter((h) => h !== hero),
+      heroStats,
+      tierList
+    );
 
     switch (mode) {
       case "pick":
         if (oppTurn) {
           vsRoster = myTeam.length > 0;
           label = vsRoster ? "vs you" : "in pool";
-          weighted = vsRoster
-            ? scoreVsTeamWeighted(hero, myTeam, matchups, plays)
-            : overallStrengthWeighted(hero, allHeroes, matchups, plays);
+          if (vsRoster) {
+            weighted = scoreVsTeamWeighted(
+              hero,
+              myTeam,
+              matchups,
+              plays,
+              myWeights
+            );
+            likelyNote = formatLikelyTargets(myTeam, myWeights, {
+              ...likelyOpts,
+              oppTeam: myTeam,
+            });
+          } else {
+            weighted = overallStrengthWeighted(hero, allHeroes, matchups, plays);
+          }
         } else {
-          vsRoster = oppTeam.length > 0;
+          vsRoster = oppRosterForPick.roster.length > 0;
           label = vsRoster ? "vs them" : "in pool";
-          weighted = vsRoster
-            ? scoreVsTeamWeighted(hero, oppTeam, matchups, plays)
-            : overallStrengthWeighted(hero, allHeroes, matchups, plays);
+          if (vsRoster) {
+            weighted = scoreVsTeamWeighted(
+              hero,
+              oppRosterForPick.roster,
+              matchups,
+              plays,
+              oppRosterForPick.weights
+            );
+            likelyNote = formatLikelyTargets(
+              oppRosterForPick.roster,
+              oppRosterForPick.weights,
+              { ...likelyOpts, oppTeam }
+            );
+          } else {
+            weighted = overallStrengthWeighted(hero, allHeroes, matchups, plays);
+          }
         }
         break;
       case "ban-opp":
         vsRoster = true;
-        label = oppTurn ? "they may ban" : "ban their best";
-        weighted = scoreVsTeamWeighted(
-          hero,
-          oppTurn ? oppTeam : myTeam,
-          matchups,
-          plays
-        );
+        if (oppTurn) {
+          label = "they may ban";
+          weighted = scoreVsTeamWeighted(
+            hero,
+            banPhaseOppRoster.roster,
+            matchups,
+            plays,
+            banPhaseOppRoster.weights
+          );
+          likelyNote = formatLikelyTargets(
+            banPhaseOppRoster.roster,
+            banPhaseOppRoster.weights,
+            { ...likelyOpts, oppTeam }
+          );
+        } else {
+          label = "ban their threat";
+          weighted = scoreVsTeamWeighted(
+            hero,
+            myTeam,
+            matchups,
+            plays,
+            myWeights
+          );
+          likelyNote = formatLikelyTargets(myTeam, myWeights, {
+            ...likelyOpts,
+            oppTeam: myTeam,
+          });
+        }
         break;
       case "ban-self":
         vsRoster = true;
-        label = oppTurn ? "they may drop" : "your weakest";
-        weighted = scoreVsTeamWeighted(
-          hero,
-          oppTurn ? myTeam : oppTeam,
-          matchups,
-          plays
-        );
+        if (oppTurn) {
+          label = "they may drop";
+          weighted = scoreVsTeamWeighted(
+            hero,
+            banPhaseOppRoster.roster,
+            matchups,
+            plays,
+            banPhaseOppRoster.weights
+          );
+          likelyNote = formatLikelyTargets(
+            banPhaseOppRoster.roster,
+            banPhaseOppRoster.weights,
+            { ...likelyOpts, oppTeam }
+          );
+        } else {
+          label = "your weakest";
+          weighted = scoreVsTeamWeighted(
+            hero,
+            banPhaseOppRoster.roster,
+            matchups,
+            plays,
+            banPhaseOppRoster.weights
+          );
+          likelyNote = formatLikelyTargets(
+            banPhaseOppRoster.roster,
+            banPhaseOppRoster.weights,
+            { ...likelyOpts, oppTeam }
+          );
+        }
         break;
       default:
         return { hero, score: null, reason: "", games: 0 };
@@ -245,7 +448,7 @@ export function getRecommendations({
     return {
       hero,
       score: resolved.rate,
-      reason: formatReason(label, resolved),
+      reason: formatReason(label, resolved, likelyNote),
       games: resolved.games,
     };
   });

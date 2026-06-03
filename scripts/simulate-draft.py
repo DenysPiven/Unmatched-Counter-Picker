@@ -101,9 +101,74 @@ def get_wr(wr: dict, plays: dict, h: str, o: str) -> float | None:
     return None
 
 
+def hero_strength(hero: str, hero_stats: dict, tier: dict) -> float:
+    bt = get_hero_bt(hero, tier)
+    if bt:
+        return bt["bt"]
+    overall = hero_stats.get(hero)
+    if overall:
+        return overall["winRate"]
+    return 0.5
+
+
+def team_pick_weights(team: list[str], hero_stats: dict, tier: dict) -> dict[str, float]:
+    if not team:
+        return {}
+    if len(team) == 1:
+        return {team[0]: 1.0}
+    strengths = [hero_strength(h, hero_stats, tier) for h in team]
+    mx = max(strengths)
+    exp = [pow(2.718281828, (s - mx) * 8) for s in strengths]
+    total = sum(exp)
+    return {team[i]: exp[i] / total for i in range(len(team))}
+
+
+def likely_pool_picks(
+    pool: list[str], hero_stats: dict, tier: dict, n: int = 3
+) -> list[str]:
+    return sorted(
+        pool,
+        key=lambda h: hero_strength(h, hero_stats, tier),
+        reverse=True,
+    )[: max(0, n)]
+
+
+def opponent_likely_roster(
+    opp_team: list[str],
+    remaining_pool: list[str],
+    hero_stats: dict,
+    tier: dict,
+    *,
+    max_future: int = 3,
+    future_weight: float = 0.35,
+) -> tuple[list[str], dict[str, float]]:
+    if not opp_team and not remaining_pool:
+        return [], {}
+    if not remaining_pool:
+        roster = list(opp_team)
+        return roster, team_pick_weights(roster, hero_stats, tier)
+
+    future = likely_pool_picks(remaining_pool, hero_stats, tier, max_future)
+    roster = list(dict.fromkeys([*opp_team, *future]))
+    weights = team_pick_weights(roster, hero_stats, tier)
+    for h in future:
+        weights[h] = weights.get(h, 0) * future_weight
+    total = sum(weights.values())
+    if total > 0:
+        weights = {h: weights[h] / total for h in roster}
+    return roster, weights
+
+
 def score_vs_team_weighted(
-    hero: str, team: list[str], wr: dict, plays: dict
+    hero: str,
+    team: list[str],
+    wr: dict,
+    plays: dict,
+    pick_weights: dict[str, float] | None = None,
 ) -> tuple[float | None, int]:
+    if not team:
+        return None, 0
+    fallback = pick_weights or {h: 1 / len(team) for h in team}
     weighted = 0.0
     games = 0
     for opp in team:
@@ -113,8 +178,9 @@ def score_vs_team_weighted(
         rate = get_wr(wr, plays, hero, opp)
         if rate is None:
             continue
-        weighted += rate * p
-        games += p
+        w = fallback.get(opp, 1 / len(team))
+        weighted += rate * p * w
+        games += p * w
     if games > 0:
         return weighted / games, games
     return None, 0
@@ -203,23 +269,35 @@ def rank_heroes(
     tier: dict,
     mode: str,
     *,
+    remaining_pool: list[str] | None = None,
     for_user_pick: bool = False,
 ) -> list[tuple[str, float]]:
     vs_roster = mode != "pick" or len(opp_team) > 0 or len(my_team) > 0
     scored: list[tuple[str, float]] = []
 
+    my_weights = team_pick_weights(my_team, hero_stats, tier)
+    opp_roster, opp_weights = opponent_likely_roster(
+        opp_team, remaining_pool or [], hero_stats, tier
+    )
+
     for hero in candidates:
         if mode == "pick":
-            if len(opp_team) > 0:
-                m_rate, m_games = score_vs_team_weighted(hero, opp_team, wr, plays)
+            if opp_roster:
+                m_rate, m_games = score_vs_team_weighted(
+                    hero, opp_roster, wr, plays, opp_weights
+                )
             else:
                 m_rate, m_games = overall_strength(hero, pool, wr, plays)
         elif mode == "ban-opp":
-            m_rate, m_games = score_vs_team_weighted(hero, my_team, wr, plays)
+            m_rate, m_games = score_vs_team_weighted(
+                hero, my_team, wr, plays, my_weights
+            )
         else:  # ban-self
-            m_rate, m_games = score_vs_team_weighted(hero, opp_team, wr, plays)
+            m_rate, m_games = score_vs_team_weighted(
+                hero, opp_roster, wr, plays, opp_weights
+            )
 
-        if mode == "pick" and len(opp_team) == 0:
+        if mode == "pick" and not opp_roster:
             vs_roster_flag = False
         else:
             vs_roster_flag = True
@@ -270,9 +348,20 @@ def system_choice(
     tier: dict,
     mode: str,
     rng: random.Random,
+    *,
+    remaining_pool: list[str] | None = None,
 ) -> str | None:
     ranked = rank_heroes(
-        candidates, st.my_team, st.opp_team, pool, wr, plays, hero_stats, tier, mode,
+        candidates,
+        st.my_team,
+        st.opp_team,
+        pool,
+        wr,
+        plays,
+        hero_stats,
+        tier,
+        mode,
+        remaining_pool=remaining_pool,
         for_user_pick=True,
     )
     k = BAN_TOP_K if mode != "pick" else PICK_TOP_K
@@ -289,23 +378,35 @@ def adversarial_choice(
     tier: dict,
     mode: str,
     rng: random.Random,
+    *,
+    remaining_pool: list[str] | None = None,
 ) -> str | None:
     """Opponent plays to hurt you: strong picks vs you, bans your best."""
+    my_weights = team_pick_weights(st.my_team, hero_stats, tier)
+    opp_roster, opp_weights = opponent_likely_roster(
+        st.opp_team, remaining_pool or [], hero_stats, tier
+    )
     scored: list[tuple[str, float]] = []
 
     for hero in candidates:
         if mode == "pick":
             if st.my_team:
-                m_rate, m_games = score_vs_team_weighted(hero, st.my_team, wr, plays)
+                m_rate, m_games = score_vs_team_weighted(
+                    hero, st.my_team, wr, plays, my_weights
+                )
                 vs_roster = True
             else:
                 m_rate, m_games = overall_strength(hero, pool, wr, plays)
                 vs_roster = False
         elif mode == "ban-opp":
-            m_rate, m_games = score_vs_team_weighted(hero, st.opp_team, wr, plays)
+            m_rate, m_games = score_vs_team_weighted(
+                hero, opp_roster, wr, plays, opp_weights
+            )
             vs_roster = True
         else:
-            m_rate, m_games = score_vs_team_weighted(hero, st.my_team, wr, plays)
+            m_rate, m_games = score_vs_team_weighted(
+                hero, st.my_team, wr, plays, my_weights
+            )
             vs_roster = True
 
         score = resolve_score(
@@ -336,14 +437,33 @@ def actor_choice(
     my_system: bool,
     opp_mode: str,
     rng: random.Random,
+    remaining_pool: list[str] | None = None,
 ) -> str:
     if actor == "me" and my_system:
         pick = system_choice(
-            candidates, st, pool, wr, plays, hero_stats, tier, mode, rng
+            candidates,
+            st,
+            pool,
+            wr,
+            plays,
+            hero_stats,
+            tier,
+            mode,
+            rng,
+            remaining_pool=remaining_pool,
         )
     elif actor == "opp" and opp_mode == "adversarial":
         pick = adversarial_choice(
-            candidates, st, pool, wr, plays, hero_stats, tier, mode, rng
+            candidates,
+            st,
+            pool,
+            wr,
+            plays,
+            hero_stats,
+            tier,
+            mode,
+            rng,
+            remaining_pool=remaining_pool,
         )
     else:
         pick = None
@@ -433,6 +553,7 @@ def run_draft_phase(
             my_system=my_system,
             opp_mode=opp_mode,
             rng=rng,
+            remaining_pool=available,
         )
         if actor == "me":
             st.my_team.append(pick)

@@ -277,17 +277,31 @@ function renderRecommendations() {
     : "Your turn — best options:";
   list.appendChild(heading);
 
+  const myActive = state.myTeam.filter((h) => !state.myBans.includes(h));
+  const oppActive = state.oppTeam.filter((h) => !state.oppBans.includes(h));
+  const taken = new Set([
+    ...state.myTeam,
+    ...state.oppTeam,
+    ...state.myBans,
+    ...state.oppBans,
+  ]);
+  const draftPool = isDraftPhase()
+    ? activePoolSlugs().filter((h) => !taken.has(h) && MATCHUPS[h])
+    : [];
+
   const recs = getRecommendations({
     available: pool,
-    myTeam: state.myTeam.filter((h) => !state.myBans.includes(h)),
-    oppTeam: state.oppTeam.filter((h) => !state.oppBans.includes(h)),
+    myTeam: myActive,
+    oppTeam: oppActive,
     mode,
     matchups: MATCHUPS,
     plays: MATCHUP_PLAYS,
     heroStats: HERO_STATS,
     tierList: TIER_LIST,
     allHeroes: activePoolSlugs(),
+    draftPool,
     actor,
+    labelHero: heroLabel,
   });
 
   recs.forEach((r, i) => {
@@ -348,16 +362,18 @@ function renderPoolTab() {
       render();
     });
     const name = document.createElement("span");
+    name.className = "pool-name";
     name.textContent = heroLabel(slug);
     label.appendChild(cb);
     label.appendChild(name);
     list.appendChild(label);
   });
 
+  const summary = `${excluded.size} excluded · ${activePoolSlugs().length} in pool`;
   const count = $("#pool-count");
-  if (count) {
-    count.textContent = `${excluded.size} excluded · ${activePoolSlugs().length} in pool`;
-  }
+  if (count) count.textContent = summary;
+  const poolTabCount = $("#pool-tab-count");
+  if (poolTabCount) poolTabCount.textContent = summary;
 }
 
 function bindTabs() {
